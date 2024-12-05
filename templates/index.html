@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA 시스템</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        #results {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .result-section {
+            margin-bottom: 20px;
+        }
+        .result-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .result-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .result-card h4 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #0056b3;
+        }
+        .source {
+            font-size: 0.9em;
+            color: #555;
+        }
+        .wiki-link, .news-link {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .wiki-link:hover, .news-link:hover {
+            text-decoration: underline;
+        }
+        #loading {
+            display: none;
+            font-size: 1.2em;
+            color: #007bff;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>질문을 입력하세요</h1>
+    <form id="question-form">
+        <input type="text" id="question" placeholder="질문을 입력하세요" required>
+        <button type="submit">질문하기</button>
+    </form>
+    <div id="loading">검색 중...</div>
+    <div id="results"></div>
+
+    <script>
+        $(document).ready(function() {
+            $('#question-form').on('submit', function(e) {
+                e.preventDefault();
+                const question = $('#question').val();
+    
+                // 검색 중 메시지 표시
+                $('#loading').show();
+                $('#results').empty();
+    
+                $.post('/ask', { question: question }, function(data) {
+                    $('#loading').hide();  // 검색 중 메시지 숨기기
+    
+                    // 법률 QA 결과
+                    $('#results').append('<div class="result-section"><div class="result-title">법률 QA 결과:</div>');
+                    if (data.legal.result === 0) {
+                        data.legal.return_object.LegalInfo.AnswerInfo.forEach(function(item) {
+                            $('#results').append(`
+                                <div class="result-card">
+                                    <h4>답변 (신뢰도: ${item.confidence.toFixed(2)})</h4>
+                                    <p>${item.answer}</p>
+                                    <p>${item.clause}</p>
+                                    <p class="source">출처: ${item.source}</p>
+                                </div>
+                            `);
+                        });
+                    } else {
+                        $('#results').append('<p>법률 QA에서 오류가 발생했습니다.</p>');
+                    }
+                    $('#results').append('</div>');
+    
+                    // 위키 QA 결과
+                    $('#results').append('<div class="result-section"><div class="result-title">위키 QA 결과:</div>');
+                    if (data.wiki.result === 0) {
+                        if (data.wiki.return_object.WiKiInfo.IRInfo.length > 0) {
+                            data.wiki.return_object.WiKiInfo.IRInfo.forEach(function(item) {
+                                $('#results').append(`
+                                    <div class="result-card">
+                                        <h4>위키 정보:</h4>
+                                        <p>${item.sent} (<a class="wiki-link" href="${item.url}" target="_blank">자세히 보기</a>)</p>
+                                    </div>
+                                `);
+                            });
+                        } else {
+                            $('#results').append('<p>관련 정보가 없습니다.</p>');
+                        }
+                    } else {
+                        $('#results').append('<p>위키 QA에서 오류가 발생했습니다.</p>');
+                    }
+                    $('#results').append('</div>');
+    
+                    // 뉴스 결과 부분 수정
+                    $('#results').append('<div class="result-section"><div class="result-title">뉴스 결과:</div>');
+                    if (data.news.items) {
+                        data.news.items.forEach(function(item) {
+                            $('#results').append(`
+                                <div class="result-card">
+                                    <h4><a class="news-link" href="${item.link}" target="_blank">${item.title}</a></h4>
+                                    <p>${item.description}</p>
+                                </div>
+                            `);
+                        });
+                    } else {
+                        $('#results').append('<p>뉴스 결과가 없습니다.</p>');
+                    }
+                    $('#results').append('</div>');
+
+    
+                }).fail(function(jqXHR) {
+                    $('#loading').hide();  // 검색 중 메시지 숨기기
+                    $('#results').text(jqXHR.responseJSON.error || '질문 처리 중 오류가 발생했습니다.');
+                });
+            });
+        });
+    </script>
+    
+</body>
+</html>
